@@ -1,0 +1,840 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>3 Patti Game</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <!-- LoadJS Library for future multiplayer support -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/loadjs/3.6.1/loadJS.min.js"></script>
+    <style>
+      /* Disable scrolling */
+      html, body {
+        overflow: hidden;
+      }
+      /* Basic Reset */
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+      body {
+        background: #101010;
+        color: #fff;
+        font-family: Arial, sans-serif;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        padding: 10px;
+        min-height: 100vh;
+      }
+      /* Login Container (صرف ای میل/پاسورڈ سے لاگ ان) */
+      #loginContainer {
+        margin-bottom: 20px;
+        padding: 20px;
+        border: 2px solid #444;
+        border-radius: 8px;
+        background: #1a1a1a;
+        text-align: center;
+        width: 90%;
+        max-width: 400px;
+      }
+      #loginContainer input {
+        width: 80%;
+        padding: 8px;
+        margin: 8px 0;
+        border: none;
+        border-radius: 4px;
+      }
+      #loginContainer button {
+        padding: 10px 20px;
+        border: none;
+        border-radius: 4px;
+        background: #ffcc00;
+        cursor: pointer;
+        font-weight: bold;
+      }
+      /* Coin Container: دائیں جانب coin PNG اور بیلنس (فوری اپڈیٹ) */
+      #coinContainer {
+        position: absolute;
+        top: 0px;
+        left: 10px;
+        background: rgba(34, 34, 34, 0.3);
+        padding: 5px;
+        border-radius: 8px;
+        box-shadow: 0 2px 6px rgba(0, 0, 0, 0.5);
+        display: flex;
+        align-items: center;
+      }
+      #coinContainer img {
+        width: 20px;
+        height: 20px;
+      }
+      #coinContainer span {
+        font-size: 1.2rem;
+        margin-left: 8px;
+        color: #ffcc00;
+      }
+      /* Game Container – Full game background using camp image */
+      .game-container {
+        width: 100%;
+        max-width: 500px;
+        background: url('https://i.imgur.com/fWSpJlx.png') no-repeat center center;
+        background-size: cover;
+        border-radius: 8px;
+        padding: 10px;
+        box-shadow: 0 0 10px rgba(0, 0, 0, 0.5);
+        position: relative;
+        display: block;
+      }
+      /* Status message: بیٹنگ ٹائم سٹیٹس (درمیان میں) */
+      .status-message {
+        text-align: center;
+        margin: 30px 0;
+        font-size: 1rem;
+        font-weight: bold;
+      }
+      /* Cards Area */
+      .cards-area {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        gap: 10px;
+        margin-bottom: 10px;
+        position: relative;
+      }
+      .card-container {
+        perspective: 1000px;
+      }
+      .card-inner {
+        position: relative;
+        width: 80px;
+        height: 110px;
+        transition: transform 0.6s;
+        transform-style: preserve-3d;
+      }
+      .card-inner.flip {
+        transform: rotateY(180deg);
+      }
+      .card-face {
+        position: absolute;
+        width: 100%;
+        height: 100%;
+        backface-visibility: hidden;
+        border-radius: 6px;
+        border: 2px solid #ffcc00;
+        object-fit: cover;
+      }
+      .card-front {
+        background: #222;
+      }
+      .card-back {
+        transform: rotateY(180deg);
+      }
+      .winner {
+        transform: scale(1.1) !important;
+        transition: transform 0.3s;
+      }
+      .countdown-circle {
+        position: absolute;
+        top: -1px;
+        right: 8px;
+        width: 30px;
+        height: 30px;
+        border-radius: 50%;
+        background: #ff6600;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: bold;
+      }
+      /* Attack Animations for winning card */
+      @keyframes attackAnimationTiger {
+        0% { transform: scale(1); }
+        50% { transform: scale(1.1) rotate(5deg); }
+        100% { transform: scale(1); }
+      }
+      @keyframes attackAnimationDragon {
+        0% { transform: scale(1); }
+        50% { transform: scale(1.1) rotate(-5deg); }
+        100% { transform: scale(1); }
+      }
+      .win-animation-tiger {
+        animation: attackAnimationTiger 1s ease;
+      }
+      .win-animation-dragon {
+        animation: attackAnimationDragon 1s ease;
+      }
+      /* Round History – Circular Items in a Row */
+      .history-bar {
+        display: flex;
+        flex-wrap: nowrap;
+        gap: 10px;
+        margin: 10px 0;
+        justify-content: center;
+      }
+      .history-item {
+        width: 20px;
+        height: 20px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: bold;
+        font-size: 1rem;
+        box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
+        position: relative;
+        overflow: hidden;
+      }
+      .history-item::before,
+      .history-item::after {
+        content: "";
+        position: absolute;
+        left: 0;
+        right: 0;
+        height: 2px;
+        background: rgba(255, 255, 255, 0.3);
+      }
+      .history-item::before {
+        top: 0;
+      }
+      .history-item::after {
+        bottom: 0;
+      }
+      .history-dragon {
+        background: linear-gradient(to bottom, #42a5f5, #0d47a1);
+        border: 2px solid #0d47a1;
+      }
+      .history-tiger {
+        background: linear-gradient(to bottom, #ff4d4d, #cc0000);
+        border: 2px solid #cc0000;
+      }
+      .history-tie {
+        background: linear-gradient(to bottom, #ffec5c, #f3c40b);
+        border: 2px solid #f3c40b;
+        color: #222;
+      }
+      /* Betting Container and Table */
+      .betting-container {
+        width: 100%;
+        max-width: 500px;
+        background: #1a1a1a;
+        border: 2px solid #444;
+        border-radius: 8px;
+        overflow: hidden;
+        margin: 10px 0;
+      }
+      .bet-table {
+        width: 100%;
+        border-collapse: collapse;
+        table-layout: fixed;
+        height: 220px;
+      }
+      .bet-table td {
+        padding: 0;
+        margin: 0;
+        width: 33.33%;
+        vertical-align: middle;
+      }
+      .bet-box {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        font-weight: bold;
+        cursor: pointer;
+        border: 2px solid #444;
+        transition: transform 0.2s;
+        padding: 10px;
+        box-shadow: 0 2px 5px rgba(0, 0, 0, 0.3);
+        min-height: 220px;
+      }
+      .bet-box:hover {
+        transform: scale(1.02);
+      }
+      .total-bets {
+        font-size: 0.9rem;
+        margin-bottom: 4px;
+        color: #fff;
+      }
+      .bet-label {
+        width: 100%;
+        text-align: center;
+        font-size: 1rem;
+        margin-bottom: 4px;
+      }
+      .bet-logo {
+        max-width: 50px;
+        max-height: 50px;
+        margin: 0 auto;
+      }
+      .user-bet {
+        font-size: 0.9rem;
+        margin-top: 4px;
+        color: #ffff00;
+      }
+      .dragon-box {
+        background: #4d94ff;
+        border-color: #4d94ff;
+      }
+      .tiger-box {
+        background: #ff4d4d;
+        border-color: #ff4d4d;
+      }
+      .tie-box {
+        background: #00cc66;
+        border-color: #00cc66;
+      }
+      .winning-prize {
+        text-align: center;
+        font-size: 1rem;
+        margin: 5px 0;
+        color: #00ff99;
+      }
+      .result-message {
+        text-align: center;
+        min-height: 24px;
+        margin: 5px 0;
+        font-size: 1rem;
+        font-weight: bold;
+      }
+      /* Coin Options Background for bet buttons */
+      #betOptions {
+        margin-top: 20px;
+        padding: 10px;
+        background: url('https://i.imgur.com/MybLECB.png') no-repeat center center;
+        background-size: cover;
+        border: 2px solid #444;
+        border-radius: 8px;
+        text-align: center;
+      }
+      #betOptions span {
+        display: block;
+        margin-bottom: 10px;
+        font-size: 1.1rem;
+        font-weight: bold;
+      }
+      .bet-option {
+        margin: 5px;
+        padding: 8px 15px;
+        background: #444;
+        border: 1px solid #fff;
+        color: #fff;
+        cursor: pointer;
+        border-radius: 4px;
+        font-size: 1rem;
+        transition: background 0.3s, color 0.3s;
+      }
+      .bet-option:hover {
+        background: #ffcc00;
+        color: #000;
+      }
+      .bet-option.selected {
+        background: #ffcc00;
+        color: #000;
+      }
+      @media (max-width: 400px) {
+        .card-inner {
+          width: 70px;
+          height: 95px;
+        }
+        .bet-box {
+          font-size: 0.9rem;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <!-- Login Container (صرف ای میل/پاسورڈ سے لاگ ان) -->
+    <div id="loginContainer">
+      <h2>Login</h2>
+      <input type="email" id="emailInput" placeholder="Email" />
+      <br />
+      <input type="password" id="passwordInput" placeholder="Password" />
+      <br />
+      <button id="loginButton">Login</button>
+      <div id="loginError" style="color: red; margin-top: 10px;"></div>
+    </div>
+
+    <!-- Game Container -->
+    <div class="game-container" id="gameContainer" style="display: none;">
+      <!-- Coin Container: دائیں جانب coin PNG اور بیلنس -->
+      <div id="coinContainer">
+        <img id="coinLogo" src="https://i.imgur.com/cMQ9X0d.png" alt="Coin Logo" />
+        <span id="coinBalanceText">0.0</span>
+      </div>
+
+      <!-- Status Message (Betting Time – درمیان میں) -->
+      <div class="status-message" id="statusMessage">
+        Betting Starts Now – 10 seconds remaining
+      </div>
+
+      <!-- Cards Area -->
+      <div class="cards-area">
+        <div class="card-container" id="dragonCardContainer">
+          <div class="card-inner" id="dragonCardInner">
+            <img class="card-face card-front" src="https://i.imgur.com/7mbkyZZ.png" alt="Face Down" />
+            <img class="card-face card-back" id="dragonCardImg" src="" alt="Dragon Card" />
+          </div>
+        </div>
+        <div class="countdown-circle" id="countdownCircle">10</div>
+        <div class="card-container" id="tigerCardContainer">
+          <div class="card-inner" id="tigerCardInner">
+            <img class="card-face card-front" src="https://i.imgur.com/7mbkyZZ.png" alt="Face Down" />
+            <img class="card-face card-back" id="tigerCardImg" src="" alt="Tiger Card" />
+          </div>
+        </div>
+      </div>
+
+      <!-- Round History (10 items prepopulated) -->
+      <div class="history-bar" id="historyBar"></div>
+
+      <!-- Betting Container -->
+      <div class="betting-container">
+        <table class="bet-table">
+          <tr>
+            <td>
+              <div class="bet-box dragon-box" id="dragonBox">
+                <div class="total-bets" id="totalBetDragon">Total: 0</div>
+                <div class="bet-label">DRAGON</div>
+                <img src="https://i.imgur.com/YJr0Rn1.png" alt="Dragon Logo" class="bet-logo" />
+                <div class="user-bet" id="userBetDragon">You: 0</div>
+              </div>
+            </td>
+            <td>
+              <div class="bet-box tie-box" id="tieBox">
+                <div class="total-bets" id="totalBetTie">Total: 0</div>
+                <div class="bet-label">TIE</div>
+                <div class="user-bet" id="userBetTie">You: 0</div>
+              </div>
+            </td>
+            <td>
+              <div class="bet-box tiger-box" id="tigerBox">
+                <div class="total-bets" id="totalBetTiger">Total: 0</div>
+                <div class="bet-label">TIGER</div>
+                <img src="https://i.imgur.com/HNTYG2n.png" alt="Tiger Logo" class="bet-logo" />
+                <div class="user-bet" id="userBetTiger">You: 0</div>
+              </div>
+            </td>
+          </tr>
+        </table>
+      </div>
+      <div class="winning-prize" id="winningPrizeDisplay"></div>
+      <div class="result-message" id="resultMessage"></div>
+      
+      <!-- Professional Bet Options at the Bottom (Coin Options Background applied) -->
+      <div id="betOptions">
+        <span>Select Bet Amount:</span>
+        <button class="bet-option" data-amount="10">10</button>
+        <button class="bet-option" data-amount="20">20</button>
+        <button class="bet-option" data-amount="30">30</button>
+        <button class="bet-option" data-amount="50">50</button>
+        <button class="bet-option" data-amount="100">100</button>
+        <button class="bet-option" data-amount="300">300</button>
+        <button class="bet-option" data-amount="500">500</button>
+        <button class="bet-option" data-amount="1000">1000</button>
+        <button class="bet-option" data-amount="3000">3000</button>
+      </div>
+    </div>
+
+    <!-- Firebase and Game Logic -->
+    <script type="module">
+      import { initializeApp } from "https://www.gstatic.com/firebasejs/9.22.1/firebase-app.js";
+      import { getAuth, onAuthStateChanged, signInWithEmailAndPassword } from "https://www.gstatic.com/firebasejs/9.22.1/firebase-auth.js";
+      import { getDatabase, ref, onValue, set } from "https://www.gstatic.com/firebasejs/9.22.1/firebase-database.js";
+
+      // Firebase configuration
+      const firebaseConfig = {
+        apiKey: "AIzaSyACWflEuk20fwT9FxoIZAmUY9UoHeU9HWY",
+        authDomain: "lacky-777.firebaseapp.com",
+        databaseURL: "https://lacky-777-default-rtdb.firebaseio.com",
+        projectId: "lacky-777",
+        storageBucket: "lacky-777.firebasestorage.app",
+        messagingSenderId: "511980111053",
+        appId: "1:511980111053:web:638227b3b60c98878b1584",
+        measurementId: "G-DEND6HY1QP"
+      };
+
+      // Initialize Firebase App
+      const appFirebase = initializeApp(firebaseConfig);
+      console.log("Firebase initialized");
+      const auth = getAuth(appFirebase);
+      const database = getDatabase(appFirebase);
+
+      // Global Variables for Coin Balance and Selected Bet Amount
+      let currentCoinBalance = 0;
+      let selectedBetAmount = 10; // Default bet amount
+
+      // Variables for user bets; bonus system removed
+      let betDragon = 0, betTiger = 0, betTie = 0;
+
+      // Flag to ensure history is prepopulated only once
+      let historyPrepopulated = false;
+
+      // Get DOM elements
+      const loginContainer = document.getElementById("loginContainer");
+      const emailInput = document.getElementById("emailInput");
+      const passwordInput = document.getElementById("passwordInput");
+      const loginButton = document.getElementById("loginButton");
+      const loginError = document.getElementById("loginError");
+      const coinBalanceText = document.getElementById("coinBalanceText");
+      const gameContainer = document.getElementById("gameContainer");
+
+      // Audio Elements
+      const bgSound = document.getElementById("backgroundSound");
+      const countdownSound = document.getElementById("countdownSound");
+      const tigerWinSound = document.getElementById("tigerWinSound");
+      const dragonWinSound = document.getElementById("dragonWinSound");
+      const tieWinSound = document.getElementById("tieWinSound");
+
+      // Function to play Background Sound (AutoPlay & Loop)
+      function playBackgroundSound() {
+        bgSound.loop = true;
+        bgSound.play().catch(error => {
+          console.log("Background audio play prevented. It will start on next user interaction.");
+        });
+      }
+
+      // فوراً کوائن ڈسپلے اپڈیٹ کریں
+      function updateCoinDisplay(newBalance) {
+        coinBalanceText.textContent = newBalance.toFixed(1);
+      }
+
+      // Login using Email and Password
+      loginButton.addEventListener("click", () => {
+        console.log("Login button clicked");
+        const email = emailInput.value;
+        const password = passwordInput.value;
+        if (!email || !password) {
+          loginError.textContent = "Please enter both email and password.";
+          return;
+        }
+        signInWithEmailAndPassword(auth, email, password)
+          .then((userCredential) => {
+            console.log("Login successful:", userCredential.user);
+            loginContainer.style.display = "none";
+            gameContainer.style.display = "block";
+            loginError.textContent = "";
+            playBackgroundSound(); // بیک گراؤنڈ ساؤنڈ چلائیں
+            if (!historyPrepopulated) {
+              prepopulateHistory();
+              historyPrepopulated = true;
+            }
+            if (!gameRoundInProgress) {
+              startGameRound();
+            }
+          })
+          .catch((error) => {
+            console.error("Login error:", error);
+            loginError.textContent = "Login Error: " + error.message;
+          });
+      });
+
+      // Monitor user authentication state and update coin display immediately
+      onAuthStateChanged(auth, (user) => {
+        if (user) {
+          const coinRef = ref(database, 'users/' + user.uid + '/coinBalance');
+          onValue(coinRef, (snapshot) => {
+            let newBalance = snapshot.val() || 0;
+            updateCoinDisplay(newBalance);
+            currentCoinBalance = newBalance;
+          });
+          loginContainer.style.display = "none";
+          gameContainer.style.display = "block";
+          playBackgroundSound(); // بیک گراؤنڈ ساؤنڈ چلائیں
+          if (!historyPrepopulated) {
+            prepopulateHistory();
+            historyPrepopulated = true;
+          }
+          if (!gameRoundInProgress) {
+            startGameRound();
+          }
+        } else {
+          loginContainer.style.display = "block";
+          gameContainer.style.display = "none";
+        }
+      });
+
+      // Function to update coin balance in Firebase
+      function updateCoinBalanceInFirebase(newBalance) {
+        const user = auth.currentUser;
+        if (user) {
+          set(ref(database, 'users/' + user.uid + '/coinBalance'), newBalance);
+        }
+      }
+
+      /************************************************
+       * Game Logic
+       ************************************************/
+      const rankValues = {
+        "A": 1, "2": 2, "3": 3, "4": 4, "5": 5,
+        "6": 6, "7": 7, "8": 8, "9": 9, "10": 10,
+        "J": 11, "Q": 12, "K": 13
+      };
+      const rankImages = {
+        "A": "https://i.imgur.com/fZbsFjl.png",
+        "2": "https://i.imgur.com/UCl3F5o.png",
+        "3": "https://i.imgur.com/wKGz5jG.png",
+        "4": "https://i.imgur.com/Z91hQPK.png",
+        "5": "https://i.imgur.com/mRaiUwO.png",
+        "6": "https://i.imgur.com/9sG95XQ.png",
+        "7": "https://i.imgur.com/J5BuDXG.png",
+        "8": "https://i.imgur.com/RswIkn4.png",
+        "9": "https://i.imgur.com/6UgozxN.png",
+        "10": "https://i.imgur.com/TSKdH7n.png",
+        "J": "https://i.imgur.com/TURDJJl.png",
+        "Q": "https://i.imgur.com/gWcKZoc.png",
+        "K": "https://i.imgur.com/gWcKZoc.png"
+      };
+      const ranksList = ["A", "2", "3", "4", "5", "6", "7", "8", "9", "10", "J", "Q", "K"];
+
+      let gameRoundInProgress = false;
+      let bettingOpen = false;
+      let gameCountdown = 10;
+      let gameCountdownInterval = null;
+
+      // Attach event listeners for bet option buttons
+      const betOptionButtons = document.querySelectorAll(".bet-option");
+      betOptionButtons.forEach((button, index) => {
+        button.addEventListener("click", function() {
+          betOptionButtons.forEach(btn => btn.classList.remove("selected"));
+          this.classList.add("selected");
+          selectedBetAmount = parseInt(this.getAttribute("data-amount"));
+        });
+        if (index === 0) {
+          button.classList.add("selected");
+        }
+      });
+
+      // Prepopulate history with 10 random items with reduced Tie chance
+      function prepopulateHistory() {
+        const historyBar = document.getElementById("historyBar");
+        historyBar.innerHTML = "";
+        for (let i = 0; i < 10; i++) {
+          let r = Math.random();
+          let option;
+          if (r < 0.45) option = "dragon";
+          else if (r < 0.9) option = "tiger";
+          else option = "tie";
+          addToHistory(option, false);
+        }
+      }
+
+      // Updated addToHistory: if more than 10 items exist, remove the oldest
+      function addToHistory(winner, checkRemoval = true) {
+        const historyBar = document.getElementById("historyBar");
+        const historyItem = document.createElement("div");
+        historyItem.classList.add("history-item");
+        if (winner === "dragon") {
+          historyItem.classList.add("history-dragon");
+          historyItem.textContent = "D";
+        } else if (winner === "tiger") {
+          historyItem.classList.add("history-tiger");
+          historyItem.textContent = "T";
+        } else {
+          historyItem.classList.add("history-tie");
+          historyItem.textContent = "=";
+        }
+        historyBar.appendChild(historyItem);
+        if (checkRemoval && historyBar.children.length > 10) {
+          historyBar.removeChild(historyBar.firstChild);
+        }
+      }
+
+      function startGameRound() {
+        gameRoundInProgress = true;
+        bettingOpen = true;
+        gameCountdown = 10;
+        document.getElementById("countdownCircle").textContent = gameCountdown;
+        document.getElementById("statusMessage").textContent = "Betting Starts Now – 10 seconds remaining";
+
+        // Reset card states
+        document.getElementById("dragonCardInner").classList.remove("flip");
+        document.getElementById("tigerCardInner").classList.remove("flip");
+        document.getElementById("dragonCardContainer").classList.remove("winner");
+        document.getElementById("tigerCardContainer").classList.remove("winner");
+
+        // Reset bets (bonus system removed)
+        betDragon = betTiger = betTie = 0;
+
+        // Update Total Bet displays (اب صرف یوزر کی بیٹس ظاہر ہوتی ہیں)
+        document.getElementById("totalBetDragon").textContent = "Total: " + betDragon;
+        document.getElementById("totalBetTiger").textContent = "Total: " + betTiger;
+        document.getElementById("totalBetTie").textContent = "Total: " + betTie;
+        document.getElementById("userBetDragon").textContent = "You: 0";
+        document.getElementById("userBetTiger").textContent = "You: 0";
+        document.getElementById("userBetTie").textContent = "You: 0";
+        document.getElementById("winningPrizeDisplay").textContent = "";
+        document.getElementById("resultMessage").textContent = "";
+
+        // Reset and start Countdown Sound from beginning
+        countdownSound.pause();
+        countdownSound.currentTime = 0;
+        countdownSound.play().catch(error => {});
+
+        // Start countdown for betting
+        gameCountdownInterval = setInterval(() => {
+          gameCountdown--;
+          document.getElementById("countdownCircle").textContent = gameCountdown;
+          document.getElementById("statusMessage").textContent = `Betting Ends In ${gameCountdown} seconds`;
+
+          if (gameCountdown <= 0) {
+            clearInterval(gameCountdownInterval);
+            bettingOpen = false;
+            // Stop countdown sound when timer reaches 0
+            countdownSound.pause();
+            document.getElementById("statusMessage").textContent = "Betting Closed – Revealing Cards...";
+            revealDragonCard();
+          }
+        }, 1000);
+      }
+
+      // Winning logic: ہمیشہ قدرتی کارڈ رینکنگ (بڑا کارڈ جیتے) استعمال کریں
+      function revealGameResult(dragonRank, tigerRank) {
+        const dValue = rankValues[dragonRank];
+        const tValue = rankValues[tigerRank];
+        let winner = "";
+        if (dValue > tValue) {
+          winner = "dragon";
+        } else if (tValue > dValue) {
+          winner = "tiger";
+        } else {
+          winner = "tie";
+        }
+
+        let payout = 0;
+        let msg = "";
+        if (winner === "tie") {
+          // Tie Win Sound پلے کریں
+          tieWinSound.play();
+          if (betTie > 0) {
+            payout = betTie * 6.3;
+            msg = "It's a TIE! Payout: " + payout;
+            currentCoinBalance += payout;
+            updateCoinBalanceInFirebase(currentCoinBalance);
+          } else {
+            msg = "No valid bet placed.";
+          }
+        } else if (winner === "dragon") {
+          // Dragon Win Sound پلے کریں
+          dragonWinSound.play();
+          if (betDragon > 0) {
+            payout = betDragon * 1.9;
+            msg = "DRAGON won! Payout: " + payout;
+            const dragonContainer = document.getElementById("dragonCardContainer");
+            dragonContainer.classList.add("win-animation-dragon");
+            setTimeout(() => dragonContainer.classList.remove("win-animation-dragon"), 1000);
+            currentCoinBalance += payout;
+            updateCoinBalanceInFirebase(currentCoinBalance);
+          } else {
+            msg = "No valid bet placed.";
+          }
+        } else if (winner === "tiger") {
+          // Tiger Win Sound پلے کریں
+          tigerWinSound.play();
+          if (betTiger > 0) {
+            payout = betTiger * 1.9;
+            msg = "TIGER won! Payout: " + payout;
+            const tigerContainer = document.getElementById("tigerCardContainer");
+            tigerContainer.classList.add("win-animation-tiger");
+            setTimeout(() => tigerContainer.classList.remove("win-animation-tiger"), 1000);
+            currentCoinBalance += payout;
+            updateCoinBalanceInFirebase(currentCoinBalance);
+          } else {
+            msg = "No valid bet placed.";
+          }
+        }
+        document.getElementById("resultMessage").textContent = msg;
+        document.getElementById("winningPrizeDisplay").textContent = "Round Winning Prize: " + payout;
+        addToHistory(winner);
+        document.getElementById("statusMessage").textContent = "Result Displayed – New Round Starting Soon...";
+        setTimeout(() => {
+          gameRoundInProgress = false;
+          startGameRound();
+        }, 5000);
+      }
+
+      // Improved card flip functions: wait for image load before adding flip class
+      function revealDragonCard() {
+        const dragonRank = getRandomRank();
+        const dragonImg = document.getElementById("dragonCardImg");
+        dragonImg.onload = function() {
+          document.getElementById("dragonCardInner").classList.add("flip");
+        };
+        dragonImg.src = rankImages[dragonRank];
+        setTimeout(() => revealTigerCard(dragonRank), 3000);
+      }
+
+      function revealTigerCard(dragonRank) {
+        const tigerRank = getRandomRank();
+        const tigerImg = document.getElementById("tigerCardImg");
+        tigerImg.onload = function() {
+          document.getElementById("tigerCardInner").classList.add("flip");
+        };
+        tigerImg.src = rankImages[tigerRank];
+        setTimeout(() => revealGameResult(dragonRank, tigerRank), 3000);
+      }
+
+      function getRandomRank() {
+        const idx = Math.floor(Math.random() * ranksList.length);
+        return ranksList[idx];
+      }
+
+      // placeBet function: یوزر کی بیٹس کو اپڈیٹ کرتا ہے
+      function placeBet(side) {
+        if (!bettingOpen) {
+          document.getElementById("resultMessage").textContent = "Betting window is closed!";
+          return;
+        }
+        if (side === "dragon" && betTiger > 0) {
+          document.getElementById("resultMessage").textContent = "You have already placed a bet on TIGER!";
+          return;
+        }
+        if (side === "tiger" && betDragon > 0) {
+          document.getElementById("resultMessage").textContent = "You have already placed a bet on DRAGON!";
+          return;
+        }
+        if (currentCoinBalance < selectedBetAmount) {
+          document.getElementById("resultMessage").textContent = "Insufficient coin balance!";
+          return;
+        }
+        currentCoinBalance -= selectedBetAmount;
+        updateCoinBalanceInFirebase(currentCoinBalance);
+        if (side === "dragon") {
+          betDragon += selectedBetAmount;
+          document.getElementById("userBetDragon").textContent = "You: " + betDragon;
+          document.getElementById("totalBetDragon").textContent = "Total: " + betDragon;
+        } else if (side === "tiger") {
+          betTiger += selectedBetAmount;
+          document.getElementById("userBetTiger").textContent = "You: " + betTiger;
+          document.getElementById("totalBetTiger").textContent = "Total: " + betTiger;
+        } else {
+          betTie += selectedBetAmount;
+          document.getElementById("userBetTie").textContent = "You: " + betTie;
+          document.getElementById("totalBetTie").textContent = "Total: " + betTie;
+        }
+        document.getElementById("resultMessage").textContent = "You placed a bet of " + selectedBetAmount + ".";
+      }
+
+      // Attach event listeners for bet boxes
+      document.getElementById("dragonBox").addEventListener("click", () => placeBet("dragon"));
+      document.getElementById("tigerBox").addEventListener("click", () => placeBet("tiger"));
+      document.getElementById("tieBox").addEventListener("click", () => placeBet("tie"));
+    </script>
+
+    <!-- Sound System Integration Placeholders -->
+    <!-- Background Sound Placeholder: یہاں پہ اپنا گیم بیک گراؤنڈ ساؤنڈ ایڈ کریں -->
+    <audio id="backgroundSound" src="background sounds .mp3" preload="auto" loop></audio>
+
+    <!-- Countdown Sound Placeholder: یہاں پہ اپنا ٹائمنگ کاؤنٹنگ ساؤنڈ ایڈ کریں -->
+    <audio id="countdownSound" src="count downing sounds .mp3" preload="auto"></audio>
+
+    <!-- Tiger Win Sound Placeholder: یہاں پہ اپنا ٹائیگر ون ساؤنڈ ایڈ کریں -->
+    <audio id="tigerWinSound" src="tiger sounds effect .mp3" preload="auto"></audio>
+
+    <!-- Dragon Win Sound Placeholder: یہاں پہ اپنا ڈریگن ون ساؤنڈ ایڈ کریں -->
+    <audio id="dragonWinSound" src="dragon sounds effect .mp3" preload="auto"></audio>
+
+    <!-- Tie Win Sound Placeholder: یہاں پہ اپنا تائی ون ساؤنڈ ایڈ کریں -->
+    <audio id="tieWinSound" src="" preload="auto"></audio>
+  </body>
+</html>
